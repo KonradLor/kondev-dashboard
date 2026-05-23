@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Serverio Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Lucide ikonos - https://lucide.dev/ - profesionalios SVG ikonos -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- app.js TURI būti įkrautas PRIEŠ Alpine.js, kad funkcija
+       dashboard() būtų apibrėžta kai Alpine.js startuoja. -->
+  <script defer src="app.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.12.0/dist/cdn.min.js"></script>
+</head>
+<body class="antialiased bg-zinc-950 text-zinc-200 min-h-screen">
+
+<div x-data="dashboard()" x-init="init()" class="max-w-7xl mx-auto p-4 sm:p-6">
+  <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
+    <div class="flex items-center flex-wrap gap-x-3">
+      <div class="text-xl sm:text-2xl font-bold title-gradient">Serveris — Valdymo skydelis</div>
+      <div class="text-sm text-zinc-400">Privati valdymo lenta</div>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+      <!-- Tinklo statusas - tik adminui -->
+      <template x-if="isAdmin">
+        <div class="flex items-center gap-3">
+          <template x-if="isOffline">
+            <div class="bg-red-700 text-red-100 px-3 py-1 rounded-md text-sm">Negaliu pasiekti serverio</div>
+          </template>
+          <div class="flex items-center space-x-2 text-sm text-zinc-400">
+            <span :class="polling ? 'bg-amber-400 animate-pulse' : 'bg-zinc-700' " class="w-3 h-3 rounded-full"></span>
+            <span x-text="polling ? 'Tinklas: aktyvus' : 'Tinklas: laikinai neveikia'"></span>
+          </div>
+        </div>
+      </template>
+
+      <!-- Svečias: Prisijungti / Registruotis -->
+      <template x-if="!authenticated">
+        <div class="flex items-center gap-2">
+          <button @click="goLogin()" class="px-4 py-1.5 rounded-md text-sm bg-zinc-800 border border-zinc-700 text-zinc-200 hover:border-zinc-500 transition">Prisijungti</button>
+          <button @click="goRegister()" class="px-4 py-1.5 rounded-md text-sm bg-amber-600 text-black font-medium hover:brightness-110 transition">Registruotis</button>
+        </div>
+      </template>
+
+      <!-- Prisijungęs: vardas + 2FA + atsijungti -->
+      <template x-if="authenticated">
+        <div class="flex items-center flex-wrap justify-end gap-2 text-sm">
+          <span class="text-zinc-400">Sveiki, <span class="text-amber-500 font-medium" x-text="currentUser"></span></span>
+          <button x-show="!isAdmin" @click="goSecurity()" title="Įjungti / valdyti dviejų veiksnių autentifikaciją (Google Authenticator)" class="px-3 py-1.5 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-amber-500 hover:text-amber-400 transition inline-flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i><span>2FA</span>
+          </button>
+          <button @click="logout()" class="px-3 py-1.5 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition">Atsijungti</button>
+        </div>
+      </template>
+    </div>
+  </header>
+
+  <main class="grid grid-cols-12 gap-4">
+    <!-- System Overview - tik adminui (paprasti vartotojai mato tik servisus) -->
+    <section x-show="isAdmin" class="col-span-12 lg:col-span-6 row-span-2 bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6 relative overflow-hidden">
+      <div class="flex items-start justify-between">
+        <h2 class="text-xl sm:text-2xl font-semibold">Sistemos apkrova</h2>
+        <div class="text-sm text-zinc-400" x-text="stats.updated_at ? 'Atnaujinta: ' + formatTimestamp(stats.updated_at) : ''"></div>
+      </div>
+      <div class="absolute -left-6 -top-6 opacity-60 pointer-events-none" aria-hidden="true">
+        <!-- decorative radar SVG -->
+        <svg width="260" height="260" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg" class="">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#f59e0b" stop-opacity="0.5"/><stop offset="1" stop-color="#ef4444" stop-opacity="0.2"/></linearGradient>
+          </defs>
+          <circle cx="130" cy="130" r="100" stroke="rgba(255,255,255,0.03)" stroke-width="14" />
+          <circle cx="130" cy="130" r="74" stroke="rgba(255,255,255,0.02)" stroke-width="8" />
+          <path d="M130 30 A100 100 0 0 1 210 130" stroke="url(#g1)" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="130" cy="130" r="6" fill="rgba(255,255,255,0.06)"/>
+        </svg>
+      </div>
+      <div class="mt-6 space-y-4">
+        <!-- CPU -->
+        <div>
+          <div class="flex items-baseline justify-between">
+            <div class="text-sm text-zinc-400">CPU • <span class="text-xs text-zinc-500" x-text="serverInfo.cpu_cores + ' branduoliai'"></span></div>
+            <div class="text-3xl sm:text-4xl font-bold tabular-nums" x-text="Math.round(stats.cpu_percent) + '%'"></div>
+          </div>
+          <div class="mt-2 h-3 bg-zinc-800 rounded-full overflow-hidden">
+            <div class="h-3 rounded-full" :style="'width: ' + Math.max(0,Math.min(100,stats.cpu_percent)) + '%; background: linear-gradient(90deg, #f59e0b, #fb923c)';"></div>
+          </div>
+        </div>
+        <!-- RAM -->
+        <div>
+          <div class="flex items-baseline justify-between">
+            <div class="text-sm text-zinc-400">RAM • <span class="text-xs text-zinc-500" x-text="formatBytes(stats.ram_used_gib * 1024 * 1024 * 1024) + ' / ' + formatBytes(stats.ram_total_gib * 1024 * 1024 * 1024)"></span></div>
+            <div class="text-3xl sm:text-4xl font-bold tabular-nums" x-text="Math.round(stats.ram_percent) + '%'"></div>
+          </div>
+          <div class="mt-2 h-3 bg-zinc-800 rounded-full overflow-hidden">
+            <div class="h-3 rounded-full" :style="'width: ' + Math.max(0,Math.min(100,stats.ram_percent)) + '%; background: linear-gradient(90deg, #7c3aed, #4f46e5)';"></div>
+          </div>
+        </div>
+        <!-- Disk -->
+        <div>
+          <div class="flex items-baseline justify-between">
+            <div class="text-sm text-zinc-400">Disk • <span class="text-xs text-zinc-500" x-text="formatBytes(stats.disk_used_gb * 1024 * 1024 * 1024) + ' / ' + formatBytes(stats.disk_total_gb * 1024 * 1024 * 1024)"></span></div>
+            <div class="text-3xl sm:text-4xl font-bold tabular-nums" x-text="Math.round(stats.disk_percent) + '%'"></div>
+          </div>
+          <div class="mt-2 h-3 bg-zinc-800 rounded-full overflow-hidden">
+            <div class="h-3 rounded-full" :style="'width: ' + Math.max(0,Math.min(100,stats.disk_percent)) + '%; background: linear-gradient(90deg, #f59e0b, #ef4444)';"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Server Info -->
+    <aside x-show="isAdmin" class="col-span-12 lg:col-span-6 bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6">
+      <h3 class="text-xl sm:text-2xl font-semibold">Serveris</h3>
+      <div class="mt-4 space-y-2 text-sm text-zinc-400">
+        <div class="flex justify-between"><span>Hostname</span><span x-text="serverInfo.hostname"></span></div>
+        <div class="flex justify-between"><span>Public IP</span><span x-text="serverInfo.public_ip"></span></div>
+        <div class="flex justify-between"><span>OS</span><span x-text="serverInfo.os + ' (' + serverInfo.arch + ')'"></span></div>
+        <div class="flex justify-between"><span>CPU</span><span x-text="serverInfo.cpu_cores + '× ' + serverInfo.cpu_model"></span></div>
+        <div class="flex justify-between"><span>RAM</span><span x-text="serverInfo.ram_gib + ' GiB'"></span></div>
+        <div class="flex justify-between"><span>Uptime</span><span x-text="uptimeString()"></span></div>
+      </div>
+    </aside>
+
+    <!-- Recent Activity -->
+    <section x-show="isAdmin" class="col-span-12 lg:col-span-6 lg:col-start-7 bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6">
+      <h3 class="text-xl sm:text-2xl font-semibold">Paskutiniai įvykiai</h3>
+      <ul class="mt-4 space-y-3 text-sm">
+        <template x-for="ev in events.slice(0,10)" :key="ev.id">
+          <li class="flex items-start space-x-3">
+            <div :class="iconBgForEvent(ev)" class="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center">
+              <i :data-lucide="iconForEvent(ev)" :class="iconColorForEvent(ev)" class="w-4 h-4"></i>
+            </div>
+            <div class="flex-1">
+              <div class="text-sm text-zinc-200" x-text="ev.message"></div>
+              <div class="text-xs text-zinc-500 mt-1" x-text="relativeTime(ev.timestamp)"></div>
+            </div>
+          </li>
+        </template>
+      </ul>
+    </section>
+
+    <!-- Services grid -->
+    <div class="col-span-12 grid grid-cols-12 gap-4">
+      <template x-for="(svc, idx) in services" :key="svc.name">
+        <article class="col-span-12 sm:col-span-6 lg:col-span-4 bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6 transform hover:scale-[1.01] transition">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center space-x-3">
+              <!-- Lucide ikona gradientinėje dėžutėje -->
+              <div class="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-700/5 border border-amber-500/20 flex items-center justify-center">
+                <i :data-lucide="svc.icon" class="w-6 h-6 text-amber-400"></i>
+              </div>
+              <div>
+                <div class="text-lg font-semibold" x-text="svc.display_name"></div>
+                <div class="text-sm text-zinc-400" x-text="svc.description"></div>
+              </div>
+            </div>
+            <div class="text-sm font-medium flex items-center space-x-2">
+              <span :class="badgeClass(svc.status)" class="px-3 py-1 rounded-full text-xs flex items-center space-x-2">
+                <span :class="dotClass(svc.status)" class="w-2 h-2 rounded-full inline-block"></span>
+                <span x-text="statusText(svc.status)"></span>
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between">
+            <div class="text-sm text-zinc-400">
+              <div x-text="'~' + svc.estimated_ram_mb + ' MB RAM'"></div>
+              <div x-text="svc.estimated_cpu_percent + '% CPU'"></div>
+            </div>
+            <div class="space-x-2">
+              <a x-show="svc.status === 'running'" :href="svc.url" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-600 text-black rounded-md text-sm font-medium hover:brightness-110 transition">
+                <i data-lucide="external-link" class="w-4 h-4"></i>
+                <span>Atidaryti</span>
+              </a>
+              <button x-show="svc.status === 'stopped'" @click="startService(svc)" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-black rounded-md text-sm font-medium hover:brightness-110 transition">
+                <i x-show="!svc._starting" data-lucide="play" class="w-4 h-4"></i>
+                <span x-show="!svc._starting">Paleisti</span>
+                <i x-show="svc._starting" data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+                <span x-show="svc._starting">Paleidžiama...</span>
+              </button>
+            </div>
+          </div>
+
+          <div x-show="svc.is_idle_now && svc.sleep_in_seconds > 0" class="mt-3 text-xs text-amber-400">
+            <span>💤</span> Užmigs po <span x-text="formatSleepCountdown(svc.sleep_in_seconds)"></span>
+            <span class="text-zinc-500">(neaktyvus)</span>
+          </div>
+
+          <div class="mt-3 text-xs text-red-400" x-text="svc._error" x-show="svc._error"></div>
+        </article>
+      </template>
+    </div>
+
+    <!-- Naujai pajungti dockeriai (admin) - veikiantys konteineriai be services.yaml -->
+    <section x-show="isAdmin && unmanagedDockers.length" class="col-span-12 bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <h3 class="text-xl sm:text-2xl font-semibold">Nauji Docker konteineriai</h3>
+        <span class="text-xs text-zinc-500" x-text="unmanagedDockers.length + ' aptikta'"></span>
+      </div>
+      <p class="text-sm text-zinc-500 mt-1 mb-4">Veikiantys konteineriai, kurių dar nėra konfigūracijoje (services.yaml)</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <template x-for="d in unmanagedDockers" :key="d.name">
+          <div class="bg-zinc-900/50 border border-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="shrink-0 w-10 h-10 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
+              <i data-lucide="box" class="w-5 h-5 text-emerald-400"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="font-semibold truncate" x-text="d.name"></div>
+              <div class="text-xs text-zinc-500 truncate" x-text="d.image"></div>
+            </div>
+            <span class="ml-auto shrink-0 px-2.5 py-1 rounded-full text-xs bg-emerald-500/15 text-emerald-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span><span x-text="d.status"></span>
+            </span>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- Vartotojai (admin) - centrinė vartotojų valdymo panelė per Authentik -->
+    <section x-show="isAdmin" class="col-span-12 bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <h3 class="text-xl sm:text-2xl font-semibold">Vartotojai</h3>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-zinc-500" x-text="users.length + ' vartotojų'"></span>
+          <button @click="loadUsers()" class="px-3 py-1.5 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition inline-flex items-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i><span>Atnaujinti</span>
+          </button>
+        </div>
+      </div>
+      <p class="text-sm text-zinc-500 mt-1 mb-4">Centrinis kondev tapatybės valdymas (Authentik)</p>
+
+      <div x-show="usersError" class="text-sm text-red-400 mb-3" x-text="usersError"></div>
+      <div x-show="usersMsg" class="text-sm text-emerald-400 mb-3" x-text="usersMsg"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <template x-for="u in users" :key="u.pk">
+          <div class="bg-zinc-900/50 border border-white/5 rounded-xl p-4">
+            <div class="flex items-start gap-3">
+              <div class="shrink-0 w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center">
+                <i data-lucide="user" class="w-5 h-5 text-amber-400"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold truncate" x-text="u.name"></span>
+                  <span x-show="u.is_admin" class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-400">admin</span>
+                  <span x-show="u.has_2fa" class="px-2 py-0.5 rounded-full text-[10px] bg-violet-500/20 text-violet-300">2FA</span>
+                  <span x-show="!u.is_active" class="px-2 py-0.5 rounded-full text-[10px] bg-red-500/20 text-red-300">išjungtas</span>
+                </div>
+                <div class="text-xs text-zinc-400 truncate" x-text="u.email || '(be email)'"></div>
+                <div class="text-[11px] text-zinc-600 mt-0.5" x-text="u.last_login ? ('Paskutinį kartą: ' + relativeTime(u.last_login)) : 'Dar neprisijungė'"></div>
+              </div>
+            </div>
+            <!-- Veiksmai (paprastiems vartotojams; adminui tik info) -->
+            <div x-show="!u.is_admin" class="mt-3 flex flex-wrap gap-2">
+              <button @click="userResetPassword(u)" class="px-2.5 py-1 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-amber-500 transition inline-flex items-center gap-1">
+                <i data-lucide="key-round" class="w-3.5 h-3.5"></i><span>Reset slaptažodį</span>
+              </button>
+              <button @click="userChangeEmail(u)" class="px-2.5 py-1 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-amber-500 transition inline-flex items-center gap-1">
+                <i data-lucide="mail" class="w-3.5 h-3.5"></i><span>Keisti email</span>
+              </button>
+              <button @click="userResendVerification(u)" class="px-2.5 py-1 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-amber-500 transition inline-flex items-center gap-1">
+                <i data-lucide="mail-check" class="w-3.5 h-3.5"></i><span>Patvirtinimo laiškas</span>
+              </button>
+              <button @click="userToggleActive(u)" :class="u.is_active ? 'hover:border-red-500' : 'hover:border-emerald-500'" class="px-2.5 py-1 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 transition inline-flex items-center gap-1">
+                <i :data-lucide="u.is_active ? 'user-x' : 'user-check'" class="w-3.5 h-3.5"></i>
+                <span x-text="u.is_active ? 'Išjungti' : 'Aktyvuoti'"></span>
+              </button>
+              <button @click="userDelete(u)" class="px-2.5 py-1 rounded-md text-xs bg-red-950/40 border border-red-800/60 text-red-300 hover:bg-red-900/50 hover:border-red-600 transition inline-flex items-center gap-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Ištrinti</span>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div x-show="users.length === 0 && !usersError" class="text-sm text-zinc-500">Vartotojų sąrašas tuščias arba dar kraunamas...</div>
+    </section>
+
+    <!-- Resources by services -->
+    <section x-show="isAdmin" class="col-span-12 bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 sm:p-6">
+      <h3 class="text-xl sm:text-2xl font-semibold">Resursai pagal servisus</h3>
+      <div class="mt-4 space-y-6">
+        <div>
+          <div class="flex justify-between mb-2 text-sm text-zinc-400"><span>CPU</span><span x-text="'Viso: ' + totalPercent(resources.cpu_breakdown) + '%'"></span></div>
+          <div class="w-full h-6 bg-zinc-800 rounded-full overflow-hidden relative">
+            <template x-for="item in resources.cpu_breakdown" :key="item.service">
+              <div class="h-6 absolute top-0" :style="'width: ' + item.percent + '%; background: ' + item.color + '; left: ' + stackedOffset(resources.cpu_breakdown, item) + '%; position: absolute;'"></div>
+            </template>
+          </div>
+          <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+            <template x-for="item in resources.cpu_breakdown" :key="item.service">
+              <div class="flex items-center space-x-2">
+                <span class="w-3 h-3 rounded-sm" :style="'background: ' + item.color"></span>
+                <span class="text-zinc-200" x-text="item.service"></span>
+                <span class="text-zinc-400 ml-auto" x-text="item.percent + '%'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-2 text-sm text-zinc-400"><span>RAM</span><span x-text="'Viso: ' + totalPercent(resources.ram_breakdown) + '%'"></span></div>
+          <div class="w-full h-6 bg-zinc-800 rounded-full overflow-hidden relative">
+            <template x-for="item in resources.ram_breakdown" :key="item.service">
+              <div class="h-6 absolute top-0" :style="'width: ' + item.percent + '%; background: ' + item.color + '; left: ' + stackedOffset(resources.ram_breakdown, item) + '%; position: absolute;'"></div>
+            </template>
+          </div>
+          <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+            <template x-for="item in resources.ram_breakdown" :key="item.service">
+              <div class="flex items-center space-x-2">
+                <span class="w-3 h-3 rounded-sm" :style="'background: ' + item.color"></span>
+                <span class="text-zinc-200" x-text="item.service"></span>
+                <span class="text-zinc-400 ml-auto" x-text="item.percent + '%'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="mt-8 text-center text-xs text-zinc-500 space-y-2">
+    <div>Konrad DevOps services</div>
+    <!-- Prisijungimas/registracija ir vartotojo info dabar viršuje (header) -->
+  </footer>
+</div>
+
+</body>
+</html>

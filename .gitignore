@@ -1,0 +1,28 @@
+# ============================================================================
+# Dashboard .gitignore
+# ============================================================================
+# SVARBU: .env NIEKADA nekomitinamas - jame slapti raktai (Authentik API tokenas,
+# INTERNAL_API_TOKEN, OIDC secret, admin slaptažodis, Gmail). Tik serveryje.
+# ============================================================================
+
+# Slapti aplinkos kintamieji
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Duomenys / logai (jie mount'inami iš /var/server-data, ne čia)
+data/
+*.log
+*.db
+*.db-*
+
+# OS / redaktorių šiukšlės
+.DS_Store
+*.swp

@@ -1,0 +1,14 @@
+# Skipped from Docker build context
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/venv
+**/.venv
+.env
+*.log
+*.swp
+Dockerfile
+docker-compose.yml
+.dockerignore
+frontend/      # frontend serveruojamas per Caddy, ne backend'e

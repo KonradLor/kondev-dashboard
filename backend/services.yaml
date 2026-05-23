@@ -1,0 +1,78 @@
+# ============================================================================
+# Dashboard servisų konfigūracija
+# ============================================================================
+# Šis failas aprašo, kuriuos servisus rodyti dashboard'e ir kaip juos valdyti.
+# Pridėti naują servisą - tiesiog pridėk naują YAML įrašą.
+# Po pakeitimo: docker compose restart dashboard-backend
+# ============================================================================
+
+# PASTABA: laukas `public` nustato, ar šis servisas matomas neprisijungusiems
+# vartotojams. Jei nėra arba false - tik admin mato.
+
+- name: caddy
+  display_name: "Caddy Proxy"
+  description: "Reverse proxy ir TLS sluoksnis"
+  # icon - Lucide icon vardas (https://lucide.dev/icons/)
+  icon: "shield"
+  category: "infrastructure"
+  container: caddy
+  url: null
+  estimated_ram_mb: 50
+  estimated_cpu_percent: 0.5
+  public: false
+
+- name: konradvault
+  display_name: "KonradVault"
+  description: "Asmeninė failų saugykla"
+  icon: "folder-lock"
+  category: "storage"
+  container: konradvault-backend
+  url: "/vault/"
+  estimated_ram_mb: 400
+  estimated_cpu_percent: 1.5
+  public: true
+
+- name: beszel
+  display_name: "Beszel Monitor"
+  description: "Serverio resursų stebėjimas (per SSH tunelį)"
+  icon: "activity"
+  category: "monitoring"
+  container: beszel
+  url: null
+  estimated_ram_mb: 80
+  estimated_cpu_percent: 0.5
+  public: false
+
+- name: dashboard
+  display_name: "Dashboard"
+  description: "Šis valdymo skydelis"
+  icon: "layout-dashboard"
+  category: "infrastructure"
+  container: dashboard-backend
+  url: "/"
+  estimated_ram_mb: 100
+  estimated_cpu_percent: 0.5
+  public: false
+
+- name: minecraft
+  display_name: "Minecraft Server"
+  description: "Paper 1.19.1 + BlueMap žemėlapis"
+  icon: "pickaxe"
+  category: "game"
+  container: minecraft
+  # BlueMap žemėlapis - 8123 portas:
+  url: "http://130.61.182.31:8123"
+  estimated_ram_mb: 6144
+  estimated_cpu_percent: 25
+  public: true
+
+- name: voice
+  display_name: "Voice Chat"
+  description: "Privatus balso ir teksto pokalbis (WebRTC)"
+  icon: "mic"
+  category: "communication"
+  container: voice-app
+  url: "https://voice.kondev.app"
+  estimated_ram_mb: 80
+  estimated_cpu_percent: 0.5
+  public: true

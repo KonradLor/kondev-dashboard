@@ -1,0 +1,18 @@
+# ============================================
+# Dashboard backend - Python dependencies
+# ============================================
+
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+
+# Sistemos resursai (CPU, RAM, disk)
+psutil==6.1.0
+
+# Docker konteinerių valdymas (start/stop/status)
+docker==7.1.0
+
+# Konfigūracijos failo nuskaitymas
+PyYAML==6.0.2
+
+# OIDC (Authentik) - token mainai + userinfo
+httpx==0.27.2

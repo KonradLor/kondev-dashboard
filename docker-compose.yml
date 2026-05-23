@@ -1,0 +1,45 @@
+# ============================================================================
+# Dashboard - docker-compose
+# ============================================================================
+# Šis konteineris valdo kitus konteinerius (start), todėl turi prieigą
+# prie Docker socket'o per /var/run/docker.sock mount'ą.
+#
+# Paleidimas:    cd /home/ubuntu/server-stack/dashboard
+#                docker compose up -d --build
+# Logai:         docker compose logs -f
+# ============================================================================
+
+services:
+  dashboard-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dashboard:latest
+    container_name: dashboard-backend
+    restart: unless-stopped
+    env_file:
+      - .env   # SLAPTI: ADMIN_USERNAME, ADMIN_PASSWORD
+    environment:
+      - PUBLIC_IP=130.61.182.31
+      - CPU_MODEL=ARM Neoverse-N1
+      - HOST_HOSTNAME=server-main-max
+      - SERVICES_CONFIG=/app/services.yaml
+      - EVENTS_LOG=/data/events.log
+      # Sleep mode: 7200s = 2h be aktyvumo prieš sustabdant servisą
+      # Tikrinama kas 60s
+      - IDLE_THRESHOLD_SECONDS=7200
+      - IDLE_CHECK_INTERVAL_SECONDS=60
+    volumes:
+      # Docker socket - leidžia valdyti kitus konteinerius (start/stop/status)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Eventų log'o saugojimas ant host'o
+      - /var/server-data/dashboard:/data
+      # services.yaml gali būti redaguojamas iš host'o be konteinerio rebuild'o
+      - ./backend/services.yaml:/app/services.yaml:ro
+    networks:
+      - web
+    # Be ports: - Caddy pasieks per "web" tinklą per serviso vardą
+
+networks:
+  web:
+    external: true
