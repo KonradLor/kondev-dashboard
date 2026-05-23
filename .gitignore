@@ -9,6 +9,8 @@
 .env
 .env.*
 *.env
+# IŠIMTIS: .env.example (pavyzdinis šablonas be secret'ų) - jį versijuojam
+!.env.example
 
 # Python
 __pycache__/
