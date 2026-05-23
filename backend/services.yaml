@@ -67,9 +67,9 @@
   public: true
 
 - name: voice
-  display_name: "Voice Chat"
-  description: "Privatus balso ir teksto pokalbis (WebRTC)"
-  icon: "mic"
+  display_name: "Video & Audio Chat"
+  description: "Privatus vaizdo, balso ir teksto pokalbis (WebRTC)"
+  icon: "video"
   category: "communication"
   container: voice-app
   url: "https://voice.kondev.app"
