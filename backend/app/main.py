@@ -758,6 +758,10 @@ def get_unmanaged_containers(user: str = Depends(require_admin)):
     # Infrastruktūros konteineriai - NErodom kaip "naujų" (vidinė virtuvė).
     ignore_prefixes = ("authentik-",)            # SSO stako vidus (db/redis/worker/server)
     ignore_exact = {"beszel-agent"}              # monitoringo agentas
+    # Vidiniai servisų backend'ai (DB, cache, TURN) - jie ne atskiros kortelės,
+    # o "po kapotu" priklausomybės. Slepiam pagal galūnę (pvz. moviedb-postgres,
+    # voice-coturn), kad nesirodytų kaip "nauji nekonfigūruoti" appsai.
+    ignore_suffixes = ("-postgres", "-redis", "-coturn", "-db", "-mariadb", "-mysql")
 
     known = {cfg.get("container") for cfg in load_services_config()}
     result = []
@@ -766,6 +770,8 @@ def get_unmanaged_containers(user: str = Depends(require_admin)):
             if c.name in known or c.name in ignore_exact:
                 continue
             if any(c.name.startswith(p) for p in ignore_prefixes):
+                continue
+            if any(c.name.endswith(s) for s in ignore_suffixes):
                 continue
             try:
                 image = c.image.tags[0] if c.image.tags else (c.image.short_id or "?")
