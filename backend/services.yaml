@@ -76,3 +76,14 @@
   estimated_ram_mb: 80
   estimated_cpu_percent: 0.5
   public: true
+
+- name: media
+  display_name: "Medijų dienoraštis"
+  description: "Asmeninė filmų, serialų, anime ir žaidimų bazė"
+  icon: "clapperboard"
+  category: "media"
+  container: moviedb-app
+  url: "https://media.kondev.app"
+  estimated_ram_mb: 250
+  estimated_cpu_percent: 1
+  public: true
